@@ -8,6 +8,7 @@ const appSettings = {
 const app = initializeApp(appSettings);
 const database = getDatabase(app);
 const shoppingListInDB = ref(database, "shoppingList");
+const historyListInDB = ref(database, "historyList");
 
 const inputFieldEl = document.getElementById("input-field");
 const addButtonEl = document.getElementById("add-button");
@@ -34,7 +35,7 @@ onValue(shoppingListInDB, function (snapshot) {
       let currentItem = itemsArray[i];
       let currentItemID = currentItem[0];
       let currentItemValue = currentItem[1];
-      appendItemToShoppingListEl(currentItem);
+      appendItemToShoppingListEl(currentItemID, currentItemValue);
     }
   } else {
     shoppingListEl.innerHTML = "No items here... yet";
@@ -49,10 +50,7 @@ function clearInputFieldEl() {
   inputFieldEl.value = "";
 }
 
-function appendItemToShoppingListEl(item) {
-  let itemID = item[0];
-  let itemValue = item[1];
-
+function appendItemToShoppingListEl(itemID, itemValue) {
   let newEl = document.createElement("li");
 
   newEl.textContent = itemValue;
@@ -63,14 +61,32 @@ function appendItemToShoppingListEl(item) {
     // Remove the item from the shopping list
     remove(exactLocationOfItemInDB);
 
-    // Add the item value and ID to the history div
-    appendItemToHistoryDiv(itemValue, itemID);
+    // Add the item value and ID to the history list
+    push(historyListInDB, { value: itemValue, id: itemID });
   });
 
   shoppingListEl.append(newEl);
 }
 
-function appendItemToHistoryDiv(itemValue, itemID) {
+onValue(historyListInDB, function (snapshot) {
+  if (snapshot.exists()) {
+    let itemsArray = Object.entries(snapshot.val());
+    clearHistoryList();
+
+    for (let i = 0; i < itemsArray.length; i++) {
+      let currentItem = itemsArray[i];
+      let currentItemID = currentItem[0];
+      let currentItemValue = currentItem[1].value;
+      appendItemToHistoryDiv(currentItemID, currentItemValue);
+    }
+  }
+});
+
+function clearHistoryList() {
+  historyDivEl.innerHTML = '';
+}
+
+function appendItemToHistoryDiv(itemID, itemValue) {
   let newHistoryItem = document.createElement('p');
   newHistoryItem.textContent = `${itemValue} - ${getCurrentDate()}`;
   newHistoryItem.dataset.itemId = itemID; // Set the item's ID as a custom data attribute
@@ -79,25 +95,26 @@ function appendItemToHistoryDiv(itemValue, itemID) {
 }
 
 function getCurrentDate() {
-  const currentDate = new Date();
-  const options = { year: 'numeric', month: 'long', day: 'numeric' };
-  return currentDate.toLocaleDateString(undefined, options);
+  const
+currentDate = new Date();
+const options = { year: 'numeric', month: 'long', day: 'numeric' };
+return currentDate.toLocaleDateString(undefined, options);
 }
 
 function saveHistoryItem(itemValue, itemID) {
-  let historyItems = getSavedHistoryItems();
-  historyItems.push({ value: itemValue, id: itemID }); // Save the item with its ID
-  localStorage.setItem(historyItemsKey, JSON.stringify(historyItems));
+let historyItems = getSavedHistoryItems();
+historyItems.push({ value: itemValue, id: itemID }); // Save the item with its ID
+localStorage.setItem(historyItemsKey, JSON.stringify(historyItems));
 }
 
 function getSavedHistoryItems() {
-  let savedItems = localStorage.getItem(historyItemsKey);
-  return savedItems ? JSON.parse(savedItems) : [];
+let savedItems = localStorage.getItem(historyItemsKey);
+return savedItems ? JSON.parse(savedItems) : [];
 }
 
 function loadHistoryItemsFromStorage() {
-  let historyItems = getSavedHistoryItems();
-  historyDivEl.innerHTML = ''; // Clear the
+let historyItems = getSavedHistoryItems();
+historyDivEl.innerHTML = ''; // Clear the
 
 const addedItems = new Set(); // Create a Set to keep track of added items
 
@@ -107,7 +124,7 @@ let currentItemValue = currentItem.value;
 let currentItemID = currentItem.id;
 
 if (!addedItems.has(currentItemValue)) {
-  appendItemToHistoryDiv(currentItemValue, currentItemID); // Pass the item's ID
+  appendItemToHistoryDiv(currentItemID, currentItemValue); // Pass the item's ID
   addedItems.add(currentItemValue); // Add the item to the Set
 }
 }
@@ -116,35 +133,19 @@ if (!addedItems.has(currentItemValue)) {
 loadHistoryItemsFromStorage(); // Call this function on page load
 
 deleteHistoryButtonEl.addEventListener("click", function () {
-
-
-
 if (confirm("Are you sure, you wont get this information back?")) {
-    // Save it!
-    clearHistoryList();
-  } else {
-    // Do nothing!
-    console.log('Thing was not saved to the database.');
-  }
-});
-
-function clearHistoryList() {
-deletedHistoryItems = [];
-const historyItems = Array.from(historyDivEl.children);
-
-historyItems.forEach((item) => {
-const itemValue = item.textContent.split(" - ")[0];
-const itemID = item.dataset.itemId; // Get the item's ID from the data attribute
-deletedHistoryItems.push({ value: itemValue, id: itemID }); // Save the item with its ID
-});
-
-historyDivEl.innerHTML = '';
-localStorage.removeItem(historyItemsKey); // Remove all items from local storage
+// Save it!
+clearHistoryList();
+remove(historyListInDB);
+} else {
+// Do nothing!
+console.log('Thing was not saved to the database.');
 }
+});
 
 undoButtonEl.addEventListener("click", function () {
 deletedHistoryItems.forEach((item) => {
-appendItemToHistoryDiv(item.value, item.id);
+appendItemToHistoryDiv(item.id, item.value);
 });
 deletedHistoryItems = [];
 });
