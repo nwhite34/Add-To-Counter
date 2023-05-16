@@ -94,9 +94,9 @@ function appendItemToHistoryDiv(itemID, itemValue) {
   saveHistoryItem(itemValue, itemID); // Save the item to local storage
 }
 
-function getCurrentDate() {
-  const
-currentDate = new Date();
+function
+getCurrentDate() {
+const currentDate = new Date();
 const options = { year: 'numeric', month: 'long', day: 'numeric' };
 return currentDate.toLocaleDateString(undefined, options);
 }
@@ -114,7 +114,7 @@ return savedItems ? JSON.parse(savedItems) : [];
 
 function loadHistoryItemsFromStorage() {
 let historyItems = getSavedHistoryItems();
-historyDivEl.innerHTML = ''; // Clear the
+historyDivEl.innerHTML = ''; // Clear the history list UI
 
 const addedItems = new Set(); // Create a Set to keep track of added items
 
@@ -122,6 +122,7 @@ for (let i = 0; i < historyItems.length; i++) {
 let currentItem = historyItems[i];
 let currentItemValue = currentItem.value;
 let currentItemID = currentItem.id;
+
 
 if (!addedItems.has(currentItemValue)) {
   appendItemToHistoryDiv(currentItemID, currentItemValue); // Pass the item's ID
@@ -132,20 +133,49 @@ if (!addedItems.has(currentItemValue)) {
 
 loadHistoryItemsFromStorage(); // Call this function on page load
 
-deleteHistoryButtonEl.addEventListener("click", function () {
-if (confirm("Are you sure, you wont get this information back?")) {
-// Save it!
-clearHistoryList();
-remove(historyListInDB);
-} else {
-// Do nothing!
-console.log('Thing was not saved to the database.');
-}
+undoButtonEl.addEventListener("click", function () {
+  if (deletedHistoryItems.length > 0) {
+    const lastDeletedItem = deletedHistoryItems.pop();
+    const { value, id } = lastDeletedItem;
+
+    // Add the item back to the history list
+    push(historyListInDB, { value, id });
+
+    // Remove the item from the deleted history items list
+    const deletedIndex = deletedHistoryItems.findIndex(item => item.id === id);
+    if (deletedIndex !== -1) {
+      deletedHistoryItems.splice(deletedIndex, 1);
+    }
+
+    // Remove the item from the UI
+    const historyItem = document.querySelector(`[data-item-id="${id}"]`);
+    if (historyItem) {
+      historyItem.remove();
+    }
+
+    // Save the updated deleted history items to local storage
+    localStorage.setItem(historyItemsKey, JSON.stringify(deletedHistoryItems));
+  }
 });
 
-undoButtonEl.addEventListener("click", function () {
-deletedHistoryItems.forEach((item) => {
-appendItemToHistoryDiv(item.id, item.value);
-});
-deletedHistoryItems = [];
+deleteHistoryButtonEl.addEventListener("click", function () {
+  if (confirm("Are you sure you want to delete the entire history? This action cannot be undone.")) {
+    // Move all history items to deleted history items
+    const historyItems = Array.from(historyDivEl.children);
+
+    historyItems.forEach((item) => {
+      const itemValue = item.textContent.split(" - ")[0];
+      const itemID = item.dataset.itemId; // Get the item's ID from the data attribute
+      deletedHistoryItems.push({ value: itemValue, id: itemID }); // Save the item with its ID
+    });
+
+    // Clear the history list
+    historyDivEl.innerHTML = "";
+    localStorage.removeItem(historyItemsKey); // Remove all items from local storage
+
+    // Remove all history items from the database
+    remove(historyListInDB);
+  } else {
+    console.log('History deletion was cancelled.');
+  }
 });
